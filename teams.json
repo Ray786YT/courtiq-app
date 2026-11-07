@@ -1,0 +1,19 @@
+{
+  "$comment": "Every team CourtIQ knows about. One passcode unlocks one team. Add a team here, set its passcode env var in Vercel, redeploy. The seed never deletes and only adds the starter roster the first time a team is created, so managers can rename or remove those placeholder players freely.",
+  "teams": [
+    {
+      "slug": "slss-senior-boys",
+      "name": "Senior Boys Volleyball",
+      "school": "Stephen Lewis Secondary School",
+      "passcodeEnv": "COURTIQ_PASSCODE",
+      "importLegacyStats": true
+    },
+    {
+      "slug": "slss-senior-girls",
+      "name": "Senior Girls Volleyball",
+      "school": "Stephen Lewis Secondary School",
+      "passcodeEnv": "COURTIQ_PASSCODE_SLSS_SENIOR_GIRLS",
+      "starterRoster": ["Jake", "Jack", "John"]
+    }
+  ]
+}

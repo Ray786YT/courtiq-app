@@ -1,0 +1,811 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 1.0.0
+  description: |
+    CourtIQ volleyball analytics API.
+
+    Stats are recorded per session (a practice or a game) rather than as one
+    running total, so season figures are a sum across sessions and a coach can
+    see change over time.
+
+    Every route except /healthz and /auth/login requires a valid team session
+    cookie. Player student IDs are stored but never returned by this API.
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Team passcode authentication
+  - name: roster
+    description: Player roster management
+  - name: sessions
+    description: Practices and games
+  - name: stats
+    description: Player stats operations
+  - name: voice
+    description: AI voice note parsing
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/me:
+    get:
+      operationId: getAuthStatus
+      tags: [auth]
+      summary: Current authentication state
+      description: Returns whether the caller holds a valid team session cookie.
+      responses:
+        "200":
+          description: Authentication state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Exchange a team passcode for a session cookie
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+        "401":
+          description: Incorrect passcode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Clear the session cookie
+      responses:
+        "200":
+          description: Signed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthStatus"
+
+  /players:
+    get:
+      operationId: getPlayers
+      tags: [roster]
+      summary: Team roster, active players first
+      responses:
+        "200":
+          description: Roster
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayersResponse"
+    post:
+      operationId: createPlayer
+      tags: [roster]
+      summary: Add a player to the roster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePlayerRequest"
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerResponse"
+        "409":
+          description: A player with that name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /players/{playerId}:
+    patch:
+      operationId: updatePlayer
+      tags: [roster]
+      summary: Edit a player
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePlayerRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerResponse"
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deactivatePlayer
+      tags: [roster]
+      summary: Remove a player from the active roster
+      description: |
+        Deactivates rather than deletes. The player stops appearing in the
+        tracker but every stat they earned stays in the team's history.
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deactivated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerResponse"
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /players/{playerId}/history:
+    get:
+      operationId: getPlayerHistory
+      tags: [stats]
+      summary: One player's stat line for every session
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session-by-session history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerHistoryResponse"
+        "404":
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions:
+    get:
+      operationId: getSessions
+      tags: [sessions]
+      summary: List practices and games, newest first
+      responses:
+        "200":
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionsResponse"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Start a new practice or game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+
+  /sessions/{sessionId}:
+    patch:
+      operationId: updateSession
+      tags: [sessions]
+      summary: Rename or re-date a practice or game
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSessionRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Delete an empty practice or game
+      description: |
+        Refused when the session has recorded stats. Clear it first if you really
+        mean to lose the numbers, so a delete can never quietly take a practice
+        with it.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+        "409":
+          description: Session still has recorded stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Session not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Stat lines for the whole roster
+      description: |
+        Omit sessionId for season-to-date totals summed across every session.
+        Pass a sessionId to get just that practice or game.
+      parameters:
+        - name: sessionId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Roster stat lines
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsResponse"
+
+  /stats/update:
+    post:
+      operationId: updateStat
+      tags: [stats]
+      summary: Apply a delta to one stat in one session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStatRequest"
+      responses:
+        "200":
+          description: Updated stat line
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerStatsResponse"
+
+  /stats/set:
+    post:
+      operationId: setStat
+      tags: [stats]
+      summary: Set one stat in one session to an exact value
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetStatRequest"
+      responses:
+        "200":
+          description: Updated stat line
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerStatsResponse"
+
+  /stats/reset:
+    post:
+      operationId: resetSessionStats
+      tags: [stats]
+      summary: Zero every stat in one session
+      description: |
+        Scoped to a single session on purpose. There is no route that clears a
+        whole season, so a misfire costs one practice rather than the year.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetStatsRequest"
+      responses:
+        "200":
+          description: Session cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatsResponse"
+
+  /voice:
+    post:
+      operationId: processVoice
+      tags: [voice]
+      summary: Parse a spoken practice summary and apply the stat changes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceRequest"
+      responses:
+        "200":
+          description: Parsed and applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    TeamSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        slug:
+          type: string
+        name:
+          type: string
+        school:
+          type: string
+      required:
+        - id
+        - slug
+        - name
+
+    AuthStatus:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+        team:
+          $ref: "#/components/schemas/TeamSummary"
+      required:
+        - authenticated
+
+    LoginRequest:
+      type: object
+      properties:
+        passcode:
+          type: string
+      required:
+        - passcode
+
+    Position:
+      type: string
+      enum: [OH, OPP, MB, S, L, DS]
+      description: |
+        Court position. OH outside, OPP right side, MB middle, S setter,
+        L libero, DS defensive specialist. Used to keep hitting comparisons
+        within a position rather than across the whole roster.
+
+    Player:
+      type: object
+      description: A roster entry. Student IDs are deliberately not exposed.
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        jerseyNumber:
+          type: integer
+        position:
+          $ref: "#/components/schemas/Position"
+        active:
+          type: boolean
+      required:
+        - id
+        - name
+        - active
+
+    CreatePlayerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        jerseyNumber:
+          type: integer
+        position:
+          $ref: "#/components/schemas/Position"
+      required:
+        - name
+
+    UpdatePlayerRequest:
+      type: object
+      description: Only the fields present are changed.
+      properties:
+        name:
+          type: string
+        jerseyNumber:
+          type: integer
+          nullable: true
+        position:
+          $ref: "#/components/schemas/Position"
+        active:
+          type: boolean
+
+    PlayerResponse:
+      type: object
+      properties:
+        player:
+          $ref: "#/components/schemas/Player"
+      required:
+        - player
+
+    PlayersResponse:
+      type: object
+      properties:
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+      required:
+        - players
+
+    StatLine:
+      type: object
+      properties:
+        hittingAttempts:
+          type: integer
+        hitsIn:
+          type: integer
+        hitsOut:
+          type: integer
+        hittingErrors:
+          type: integer
+        tips:
+          type: integer
+        blocks:
+          type: integer
+        blockingErrors:
+          type: integer
+        pass0:
+          type: integer
+        pass1:
+          type: integer
+        pass2:
+          type: integer
+        pass3:
+          type: integer
+        aces:
+          type: integer
+        servingNeutral:
+          type: integer
+        servingErrors:
+          type: integer
+        digsPositive:
+          type: integer
+        digsNegative:
+          type: integer
+      required:
+        - hittingAttempts
+        - hitsIn
+        - hitsOut
+        - hittingErrors
+        - tips
+        - blocks
+        - blockingErrors
+        - pass0
+        - pass1
+        - pass2
+        - pass3
+        - aces
+        - servingNeutral
+        - servingErrors
+        - digsPositive
+        - digsNegative
+
+    PlayerStats:
+      type: object
+      properties:
+        player:
+          $ref: "#/components/schemas/Player"
+        stats:
+          $ref: "#/components/schemas/StatLine"
+      required:
+        - player
+        - stats
+
+    PlayerStatsResponse:
+      type: object
+      properties:
+        entry:
+          $ref: "#/components/schemas/PlayerStats"
+      required:
+        - entry
+
+    StatsResponse:
+      type: object
+      properties:
+        scope:
+          type: string
+          enum: [season, session]
+        sessionId:
+          type: integer
+        players:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerStats"
+      required:
+        - scope
+        - players
+
+    SessionSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        kind:
+          type: string
+          enum: [practice, game]
+        label:
+          type: string
+        occurredOn:
+          type: string
+        opponent:
+          type: string
+        notes:
+          type: string
+      required:
+        - id
+        - kind
+        - label
+        - occurredOn
+
+    SessionsResponse:
+      type: object
+      properties:
+        sessions:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionSummary"
+      required:
+        - sessions
+
+    SessionResponse:
+      type: object
+      properties:
+        session:
+          $ref: "#/components/schemas/SessionSummary"
+      required:
+        - session
+
+    CreateSessionRequest:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [practice, game]
+        label:
+          type: string
+        occurredOn:
+          type: string
+        opponent:
+          type: string
+        notes:
+          type: string
+      required:
+        - kind
+        - label
+
+    UpdateSessionRequest:
+      type: object
+      description: Only the fields present are changed.
+      properties:
+        kind:
+          type: string
+          enum: [practice, game]
+        label:
+          type: string
+        occurredOn:
+          type: string
+        opponent:
+          type: string
+        notes:
+          type: string
+
+    PlayerHistoryEntry:
+      type: object
+      properties:
+        session:
+          $ref: "#/components/schemas/SessionSummary"
+        stats:
+          $ref: "#/components/schemas/StatLine"
+      required:
+        - session
+        - stats
+
+    PlayerHistoryResponse:
+      type: object
+      properties:
+        player:
+          $ref: "#/components/schemas/Player"
+        total:
+          $ref: "#/components/schemas/StatLine"
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerHistoryEntry"
+      required:
+        - player
+        - total
+        - entries
+
+    UpdateStatRequest:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+        playerId:
+          type: integer
+        stat:
+          type: string
+        delta:
+          type: integer
+      required:
+        - sessionId
+        - playerId
+        - stat
+        - delta
+
+    SetStatRequest:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+        playerId:
+          type: integer
+        stat:
+          type: string
+        value:
+          type: integer
+      required:
+        - sessionId
+        - playerId
+        - stat
+        - value
+
+    ResetStatsRequest:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+      required:
+        - sessionId
+
+    StatChange:
+      type: object
+      properties:
+        playerId:
+          type: integer
+        playerName:
+          type: string
+        stat:
+          type: string
+        delta:
+          type: integer
+      required:
+        - playerId
+        - playerName
+        - stat
+        - delta
+
+    VoiceRequest:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+        transcript:
+          type: string
+      required:
+        - sessionId
+        - transcript
+
+    VoiceResponse:
+      type: object
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatChange"
+        updated:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlayerStats"
+        unmatched:
+          type: array
+          items:
+            type: string
+      required:
+        - changes
+        - updated
+        - unmatched

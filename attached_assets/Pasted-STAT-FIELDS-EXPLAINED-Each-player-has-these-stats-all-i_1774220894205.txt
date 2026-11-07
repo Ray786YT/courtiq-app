@@ -1,0 +1,63 @@
+STAT FIELDS EXPLAINED
+Each player has these stats (all integers, start at 0 if no data):
+
+Hitting: hittingAttempts, hitsIn, hitsOut, hittingErrors, tips
+Blocking: blocks, blockingErrors
+Passing: pass0, pass1, pass2, pass3 (pass quality ratings 0–3)
+Serving: aces, servingNeutral, servingErrors
+Digs: digsPositive, digsNegative
+
+Computed stats (calculate live on the frontend, do not store):
+
+Hitting Average = (hitsIn - hittingErrors) / hittingAttempts
+Passing Average = (0×pass0 + 1×pass1 + 2×pass2 + 3×pass3) / (pass0+pass1+pass2+pass3)
+Serving Total = aces + servingNeutral + servingErrors
+Serving % = aces / Serving Total
+Blocking Total = blocks + blockingErrors
+Digs Total = digsPositive + digsNegative
+
+
+PAGE 1 — STAT EDITOR
+
+Top nav with two tabs: "Manual Entry" and "Voice Note"
+A player selector dropdown showing all roster names
+A stat category tab row: Hitting | Blocking | Passing | Serving | Digs
+Once a player and category are selected, show large +/- increment buttons for each stat field in that category. Each row shows: stat label, a big minus button, current value, a big plus button. Tapping +/- immediately updates the value and saves to the backend
+Below the buttons, show a live mini stat card for that player showing all their computed averages and totals
+
+
+PAGE 2 — TEAM STATS TABLE
+
+Full spreadsheet-style table of all players and all their stats
+Each cell is editable inline — click to edit, press Enter or click away to save
+A button to export the whole table as a CSV file
+A "Reset All Stats" button with a confirmation popup before it does anything
+A leaderboard sidebar showing top players ranked by hitting average, passing average, and serving percentage
+
+
+VOICE NOTE FEATURE (second tab on Page 1)
+
+A big red "Start Recording" button. Use the browser's Web Speech API (SpeechRecognition or webkitSpeechRecognition) to record the manager's voice. Show a live transcript on screen as they speak.
+When they tap "Stop Recording", send the transcript to the backend via a POST request.
+The backend sends the transcript plus the full current stats JSON to the Claude API with this exact system prompt: "You are a volleyball stats parser for a high school team. You will be given a voice transcript from a coach or manager describing what happened in practice or a game, and the current stats JSON. Extract all stat changes mentioned and return ONLY a JSON array of updates in this exact format: [{ "player": "Name", "stat": "statFieldName", "delta": number }]. Use the exact field names from the stats schema. Match player names loosely — if someone says 'Ray' match it to 'Rayyan'. Return only valid JSON with no explanation, no markdown, no backticks."
+Parse the Claude response and apply each delta to the stats, then save to stats.json and return the updated stats to the frontend
+Show a summary card listing every change that was made, e.g. "Rayyan +1 ace · Nathan +2 pass3"
+
+
+BACKEND API ROUTES
+
+GET /api/stats — return the full stats JSON
+POST /api/stats/update — body: { playerName, stat, delta } — apply delta to that player's stat, save to file, return updated player
+POST /api/stats/set — body: { playerName, stat, value } — for inline table edits, set a specific value directly
+POST /api/voice — body: { transcript } — call Claude API, parse response, apply all deltas, return { changes, updatedPlayers }
+POST /api/reset — reset all stats to zero (keep player names and IDs), save to file
+
+
+UI / DESIGN
+
+Dark mode by default
+Mobile-first layout — this will mostly be used on a phone during practice
+Minimum 48px tap target height on all buttons
+Color palette: navy blue background, white text, gold/yellow accent buttons
+Clean sans-serif font (Inter or similar)
+Smooth transitions when values update

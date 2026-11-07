@@ -1,0 +1,13 @@
+packages:
+  "framer-motion": "Smooth animations for stat changes and voice recording pulse"
+  "clsx": "Utility for conditionally merging classes"
+  "tailwind-merge": "Utility for resolving tailwind class conflicts"
+
+images:
+  - path: "artifacts/volleyball-app/public/images/header-bg.png"
+    description: "Abstract dark navy and dark blue gradient background with subtle gold light leaks, professional sports broadcast aesthetic, moody and cinematic, low contrast"
+    aspect_ratio: "16:9"
+
+notes:
+  - "App uses the provided @workspace/api-client-react generated hooks for fetching, and wraps mutations to handle React Query cache invalidation."
+  - "Web Speech API is used for voice notes, with fallback handling for unsupported browsers."

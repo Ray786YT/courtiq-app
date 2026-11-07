@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SLSS Senior Boys Volleyball"
+version = "1.0.0"
+id = "artifacts/volleyball-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19015
+
+[services.development]
+run = "pnpm --filter @workspace/volleyball-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/volleyball-app", "run", "build" ]
+publicDir = "artifacts/volleyball-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19015"
+BASE_PATH = "/"
